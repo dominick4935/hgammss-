@@ -1,0 +1,69 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GameHub</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <h1>GameHub<span>.</span></h1>
+  <nav>
+    <button onclick="showPage('home')">Games</button>
+    <button onclick="showPage('browser')">Browser</button>
+    <button onclick="showPage('favorites')">Favorites</button>
+  </nav>
+</header>
+
+<main>
+  <section id="home">
+    <div class="hero">
+      <h2>Play Without Limits.</h2>
+      <p>Your gaming collection, all in one place.</p>
+      <input id="search" placeholder="Search games..." oninput="renderGames()">
+    </div>
+
+    <div class="categories">
+      <button onclick="setCategory('All')">All</button>
+      <button onclick="setCategory('Arcade')">Arcade</button>
+      <button onclick="setCategory('Action')">Action</button>
+      <button onclick="setCategory('Racing')">Racing</button>
+      <button onclick="setCategory('Puzzle')">Puzzle</button>
+    </div>
+
+    <h2>Game Library</h2>
+    <div id="games" class="game-grid"></div>
+  </section>
+
+  <section id="browser" class="hidden">
+    <h2>Web Browser</h2>
+    <p>Visit websites that allow embedding.</p>
+    <form id="browserForm">
+      <input id="browserUrl" placeholder="https://example.com" required>
+      <button type="submit">Go</button>
+    </form>
+    <iframe id="browserFrame" title="Embedded website"
+      referrerpolicy="no-referrer"></iframe>
+    <p id="browserMessage"></p>
+  </section>
+
+  <section id="favorites" class="hidden">
+    <h2>Your Favorites</h2>
+    <div id="favoriteGames" class="game-grid"></div>
+  </section>
+
+  <section id="player" class="hidden">
+    <button onclick="showPage('home')">← Back to games</button>
+    <h2 id="playerTitle"></h2>
+    <iframe id="gameFrame" title="Game player"
+      allowfullscreen></iframe>
+  </section>
+</main>
+
+<footer>GameHub © 2026</footer>
+<script src="script.js"></script>
+</body>
+</html>
