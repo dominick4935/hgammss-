@@ -1,67 +1,98 @@
+/* ================= CONFIG =================
+ * Web search
+ * - googleSearchId: paste a Google Programmable Search Engine ID ("cx") to show
+ *   results right inside GameHub. Create one free at
+ *   https://programmablesearchengine.google.com → "Search the entire web".
+ * - Without an ID, searches open in a new tab on the fallback engine.
+ *   (Google, Bing and DuckDuckGo all refuse to load inside an iframe.)
+ */
+const CONFIG = {
+  googleSearchId: "",
+  fallbackSearchUrl: "https://duckduckgo.com/?q="
+};
 
+/* ================= GAMES =================
+ * Add a "url" to each game to make its Play button work.
+ */
 const games = [
-  {
-    name: "Example Arcade",
-    category: "Arcade",
-    description: "Your first game entry",
-    url: ""
-  },
-  {
-    name: "Puzzle Challenge",
-    category: "Puzzle",
-    description: "A puzzle game",
-    url: ""
-  },
-  {
-    name: "Racing Challenge",
-    category: "Racing",
-    description: "A racing game",
-    url: ""
-  },
-  {
-    name: "Action Adventure",
-    category: "Action",
-    description: "An action game",
-    url: ""
-  }
+  { name: "Example Arcade",   category: "Arcade", description: "Your first game entry", url: "" },
+  { name: "Puzzle Challenge", category: "Puzzle", description: "A puzzle game",         url: "" },
+  { name: "Racing Challenge", category: "Racing", description: "A racing game",         url: "" },
+  { name: "Action Adventure", category: "Action", description: "An action game",        url: "" }
 ];
 
-let category = "All";
-let favorites = JSON.parse(
-  localStorage.getItem("gamehub-favorites") || "[]"
-);
+/* ================= HELPERS ================= */
+const $ = id => document.getElementById(id);
 
-function showPage(page) {
-  ["home", "browser", "favorites", "player"].forEach(id => {
-    document.getElementById(id).classList.add("hidden");
-  });
-
-  document.getElementById(page).classList.remove("hidden");
-}
-
-function setCategory(value) {
-  category = value;
-  renderGames();
-}
-
-function toggleFavorite(name) {
-  if (favorites.includes(name)) {
-    favorites = favorites.filter(item => item !== name);
-  } else {
-    favorites.push(name);
+const store = {
+  get(key, fallback) {
+    try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
+    catch { return fallback; }
+  },
+  set(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage blocked */ }
   }
+};
 
-  localStorage.setItem(
-    "gamehub-favorites",
-    JSON.stringify(favorites)
+const CATEGORIES = ["All", ...new Set(games.map(g => g.category))];
+let category = "All";
+let favorites = new Set(store.get("gamehub-favorites", []));
+
+/* ================= NAVIGATION ================= */
+function showPage(page) {
+  document.querySelectorAll(".page").forEach(section =>
+    section.classList.toggle("hidden", section.id !== page)
   );
 
+  const navTarget = page === "player" ? "home" : page;
+  document.querySelectorAll(".nav-btn").forEach(btn =>
+    btn.classList.toggle("active", btn.dataset.page === navTarget)
+  );
+
+  // Stop any running game (and its audio) when leaving the player
+  if (page !== "player") $("gameFrame").src = "about:blank";
+
+  if (page === "browser") $("browserInput").focus();
+  window.scrollTo({ top: 0 });
+}
+
+document.querySelectorAll(".nav-btn").forEach(btn =>
+  btn.addEventListener("click", () => showPage(btn.dataset.page))
+);
+
+/* ================= CATEGORIES ================= */
+function renderCategories() {
+  const container = $("categories");
+  container.replaceChildren();
+
+  CATEGORIES.forEach(name => {
+    const chip = document.createElement("button");
+    chip.className = "chip" + (name === category ? " active" : "");
+    chip.textContent = name;
+    chip.setAttribute("aria-pressed", name === category);
+    chip.addEventListener("click", () => {
+      category = name;
+      renderCategories();
+      renderGames();
+    });
+    container.appendChild(chip);
+  });
+}
+
+/* ================= GAME CARDS ================= */
+function toggleFavorite(name) {
+  favorites.has(name) ? favorites.delete(name) : favorites.add(name);
+  store.set("gamehub-favorites", [...favorites]);
   renderGames();
 }
 
 function createCard(game) {
-  const card = document.createElement("div");
+  const card = document.createElement("article");
   card.className = "game-card";
+
+  const tag = document.createElement("span");
+  tag.className = "tag";
+  tag.textContent = game.category;
 
   const title = document.createElement("h3");
   title.textContent = game.name;
@@ -69,81 +100,176 @@ function createCard(game) {
   const description = document.createElement("p");
   description.textContent = game.description;
 
-  const type = document.createElement("p");
-  type.textContent = game.category;
+  const actions = document.createElement("div");
+  actions.className = "card-actions";
 
   const play = document.createElement("button");
-  play.textContent = "Play";
-  play.onclick = () => openGame(game);
+  play.className = "primary";
+  if (game.url) {
+    play.textContent = "▶ Play";
+    play.addEventListener("click", () => openGame(game));
+  } else {
+    play.textContent = "Coming soon";
+    play.disabled = true;
+    play.title = "Add a url for this game in script.js";
+  }
 
+  const isFav = favorites.has(game.name);
   const favorite = document.createElement("button");
-  favorite.textContent = favorites.includes(game.name)
-    ? "★ Favorited"
-    : "☆ Favorite";
-  favorite.onclick = () => toggleFavorite(game.name);
+  favorite.className = "icon-btn" + (isFav ? " is-fav" : "");
+  favorite.textContent = isFav ? "★" : "☆";
+  favorite.setAttribute("aria-label", isFav ? "Remove from favorites" : "Add to favorites");
+  favorite.setAttribute("aria-pressed", isFav);
+  favorite.addEventListener("click", () => toggleFavorite(game.name));
 
-  card.append(title, description, type, play, favorite);
+  actions.append(play, favorite);
+  card.append(tag, title, description, actions);
   return card;
 }
 
 function renderGames() {
-  const query = document.getElementById("search").value.toLowerCase();
+  const query = $("search").value.trim().toLowerCase();
 
   const filtered = games.filter(game =>
-    game.name.toLowerCase().includes(query) &&
-    (category === "All" || game.category === category)
+    (category === "All" || game.category === category) &&
+    [game.name, game.description, game.category].some(text =>
+      text.toLowerCase().includes(query)
+    )
   );
 
-  const container = document.getElementById("games");
-  container.replaceChildren();
+  $("games").replaceChildren(...filtered.map(createCard));
+  $("gamesEmpty").classList.toggle("hidden", filtered.length > 0);
+  $("resultCount").textContent = `${filtered.length} game${filtered.length === 1 ? "" : "s"}`;
 
-  filtered.forEach(game => container.appendChild(createCard(game)));
   renderFavorites();
 }
 
 function renderFavorites() {
-  const container = document.getElementById("favoriteGames");
-  container.replaceChildren();
-
-  games
-    .filter(game => favorites.includes(game.name))
-    .forEach(game => container.appendChild(createCard(game)));
+  const favGames = games.filter(game => favorites.has(game.name));
+  $("favoriteGames").replaceChildren(...favGames.map(createCard));
+  $("favoritesEmpty").classList.toggle("hidden", favGames.length > 0);
+  $("favCount").textContent = favGames.length;
 }
 
-function openGame(game) {
-  if (!game.url) {
-    alert("Add a valid game URL to this game in script.js first.");
-    return;
-  }
+$("search").addEventListener("input", renderGames);
 
-  document.getElementById("playerTitle").textContent = game.name;
-  document.getElementById("gameFrame").src = game.url;
+/* ================= PLAYER ================= */
+function openGame(game) {
+  $("playerTitle").textContent = game.name;
+  $("gameFrame").src = game.url;
   showPage("player");
 }
 
-document.getElementById("browserForm").addEventListener("submit", event => {
-  event.preventDefault();
-
-  const input = document.getElementById("browserUrl");
-  let url;
-
-  try {
-    url = new URL(input.value);
-  } catch {
-    document.getElementById("browserMessage").textContent =
-      "Please enter a valid website address.";
-    return;
-  }
-
-  if (url.protocol !== "https:") {
-    document.getElementById("browserMessage").textContent =
-      "Only HTTPS websites are supported.";
-    return;
-  }
-
-  document.getElementById("browserFrame").src = url.href;
-  document.getElementById("browserMessage").textContent =
-    "Some websites do not allow embedding.";
+$("backBtn").addEventListener("click", () => showPage("home"));
+$("fullscreenBtn").addEventListener("click", () => {
+  const frame = $("gameFrame");
+  (frame.requestFullscreen || frame.webkitRequestFullscreen)?.call(frame);
 });
 
+/* ================= BROWSER + WEB SEARCH ================= */
+function setBrowserMessage(text) {
+  $("browserMessage").textContent = text;
+}
+
+function looksLikeUrl(text) {
+  if (/\s/.test(text)) return false;
+  if (/^https?:\/\//i.test(text)) return true;
+  return /^[\w-]+(\.[\w-]+)+(:\d+)?([/?#].*)?$/.test(text); // e.g. example.com/page
+}
+
+function openSite(href) {
+  $("searchResults").classList.add("hidden");
+  $("frameWrap").classList.remove("hidden");
+  $("browserFrame").src = href;
+  $("frameUrl").textContent = href;
+  $("frameOpen").href = href;
+  setBrowserMessage("If the page stays blank, that site blocks embedding — use “Open in new tab”.");
+}
+
+let googleSearchReady = null;
+function loadGoogleSearch() {
+  if (googleSearchReady) return googleSearchReady;
+
+  googleSearchReady = new Promise((resolve, reject) => {
+    window.__gcse = {
+      parsetags: "explicit",
+      initializationCallback() {
+        google.search.cse.element.render({
+          div: "gcse",
+          tag: "searchresults-only",
+          gname: "gamehub",
+          attributes: { linkTarget: "_blank" }
+        });
+        resolve(google.search.cse.element.getElement("gamehub"));
+      }
+    };
+
+    const script = document.createElement("script");
+    script.src = "https://cse.google.com/cse.js?cx=" + encodeURIComponent(CONFIG.googleSearchId);
+    script.async = true;
+    script.onerror = () => {
+      googleSearchReady = null;
+      reject(new Error("Search failed to load"));
+    };
+    document.head.appendChild(script);
+  });
+
+  return googleSearchReady;
+}
+
+function runSearch(query) {
+  if (!CONFIG.googleSearchId) {
+    window.open(CONFIG.fallbackSearchUrl + encodeURIComponent(query), "_blank", "noopener");
+    setBrowserMessage(`Opened results for “${query}” in a new tab.`);
+    return;
+  }
+
+  $("frameWrap").classList.add("hidden");
+  $("searchResults").classList.remove("hidden");
+  setBrowserMessage(`Searching for “${query}”…`);
+
+  loadGoogleSearch()
+    .then(search => {
+      search.execute(query);
+      setBrowserMessage(`Results for “${query}” — links open in a new tab.`);
+    })
+    .catch(() => {
+      $("searchResults").classList.add("hidden");
+      window.open(CONFIG.fallbackSearchUrl + encodeURIComponent(query), "_blank", "noopener");
+      setBrowserMessage("Built-in search couldn't load, so results opened in a new tab.");
+    });
+}
+
+$("browserForm").addEventListener("submit", event => {
+  event.preventDefault();
+  const value = $("browserInput").value.trim();
+  if (!value) return;
+
+  if (!looksLikeUrl(value)) {
+    runSearch(value);
+    return;
+  }
+
+  let url;
+  try {
+    url = new URL(/^https?:\/\//i.test(value) ? value : "https://" + value);
+  } catch {
+    setBrowserMessage("That doesn't look like a valid web address.");
+    return;
+  }
+  if (url.protocol === "http:") url.protocol = "https:"; // upgrade insecure links
+  openSite(url.href);
+});
+
+/* ================= KEYBOARD ================= */
+document.addEventListener("keydown", event => {
+  const typing = ["INPUT", "TEXTAREA"].includes(document.activeElement.tagName);
+  if (event.key === "/" && !typing && !$("home").classList.contains("hidden")) {
+    event.preventDefault();
+    $("search").focus();
+  }
+});
+
+/* ================= START ================= */
+renderCategories();
 renderGames();
