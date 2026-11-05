@@ -1,10 +1,9 @@
 /* ================= CONFIG =================
- * Web search (Brave Search, shown inside GameHub)
- * Paste the URL of your deployed worker.js (see the setup steps at the top of
- * worker.js), e.g. "https://gamehub-search.yourname.workers.dev"
+ * Web search: queries load search.brave.com inside the Browser tab.
  */
 const CONFIG = {
-  searchProxyUrl: ""
+  searchUrl: "https://search.brave.com/search?q=",
+  homeUrl: "https://search.brave.com/"
 };
 
 /* ================= GAMES =================
@@ -48,7 +47,10 @@ function showPage(page) {
   // Stop any running game (and its audio) when leaving the player
   if (page !== "player") $("gameFrame").src = "about:blank";
 
-  if (page === "browser") $("browserInput").focus();
+  if (page === "browser") {
+    ensureBrowserStarted();
+    $("browserInput").focus();
+  }
   window.scrollTo({ top: 0 });
 }
 
@@ -173,110 +175,44 @@ function looksLikeUrl(text) {
   return /^[\w-]+(\.[\w-]+)+(:\d+)?([/?#].*)?$/.test(text); // e.g. example.com/page
 }
 
-const searchState = { query: "", offset: 0, more: false, hasResults: false };
+const visited = []; // pages loaded from the address bar, for the ← button
 
-function openSite(href, fromResults = false) {
-  $("searchResults").classList.add("hidden");
+function loadInFrame(href) {
   $("frameWrap").classList.remove("hidden");
-  $("backToResults").classList.toggle("hidden", !(fromResults && searchState.hasResults));
   $("browserFrame").src = href;
   $("frameUrl").textContent = href;
   $("frameOpen").href = href;
-  setBrowserMessage("If the page stays blank, that site blocks embedding — use “Open in new tab”.");
+  $("frameBack").disabled = visited.length < 2;
 }
 
-function showResults() {
-  $("frameWrap").classList.add("hidden");
-  $("browserFrame").src = "about:blank";
-  $("searchResults").classList.remove("hidden");
+function openSite(href) {
+  visited.push(href);
+  loadInFrame(href);
+  setBrowserMessage("If a site stays blank, it blocks embedding — use “Open in new tab”.");
 }
 
-// Brave descriptions contain <strong> tags; turn them into safe plain text
-function plainText(html) {
-  return new DOMParser().parseFromString(html || "", "text/html").body.textContent;
+function runSearch(query) {
+  openSite(CONFIG.searchUrl + encodeURIComponent(query));
+  setBrowserMessage(`Brave results for “${query}”`);
 }
 
-function renderResults(results) {
-  const list = $("resultList");
-  list.replaceChildren();
-
-  results.forEach(result => {
-    const item = document.createElement("li");
-    item.className = "result";
-
-    const link = document.createElement("a");
-    link.href = result.url;
-    link.className = "result-title";
-    link.textContent = plainText(result.title);
-    link.addEventListener("click", event => {
-      event.preventDefault();
-      openSite(result.url, true);
-    });
-
-    const site = document.createElement("span");
-    site.className = "result-url";
-    site.textContent = result.url.replace(/^https?:\/\//, "");
-
-    const description = document.createElement("p");
-    description.textContent = plainText(result.description);
-
-    item.append(site, link, description);
-    list.appendChild(item);
-  });
-
-  $("prevPage").disabled = searchState.offset === 0;
-  $("nextPage").disabled = !searchState.more;
-}
-
-async function runSearch(query, offset = 0) {
-  showResults();
-
-  if (!CONFIG.searchProxyUrl) {
-    $("resultList").replaceChildren();
-    setBrowserMessage("Search isn't connected yet — add your worker URL to CONFIG.searchProxyUrl in script.js.");
-    return;
-  }
-
-  setBrowserMessage(`Searching Brave for “${query}”…`);
-  $("resultList").classList.add("loading");
-
-  try {
-    const endpoint = new URL(CONFIG.searchProxyUrl);
-    endpoint.searchParams.set("q", query);
-    endpoint.searchParams.set("offset", offset);
-
-    const response = await fetch(endpoint);
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || `Error ${response.status}`);
-
-    Object.assign(searchState, {
-      query,
-      offset,
-      more: Boolean(data.more),
-      hasResults: data.results.length > 0
-    });
-
-    renderResults(data.results);
-    setBrowserMessage(data.results.length
-      ? `Results for “${query}”${offset ? ` — page ${offset + 1}` : ""}`
-      : `No results for “${query}”.`);
-    window.scrollTo({ top: 0 });
-  } catch (error) {
-    setBrowserMessage(`Search failed: ${error.message}`);
-  } finally {
-    $("resultList").classList.remove("loading");
+// Open Brave Search the first time the Browser tab is shown
+function ensureBrowserStarted() {
+  if (visited.length === 0) {
+    openSite(CONFIG.homeUrl);
+    setBrowserMessage("");
   }
 }
 
-$("prevPage").addEventListener("click", () =>
-  runSearch(searchState.query, Math.max(0, searchState.offset - 1))
-);
-$("nextPage").addEventListener("click", () =>
-  runSearch(searchState.query, searchState.offset + 1)
-);
-$("backToResults").addEventListener("click", () => {
-  showResults();
-  setBrowserMessage(`Results for “${searchState.query}”`);
+$("frameBack").addEventListener("click", () => {
+  if (visited.length < 2) return;
+  visited.pop();
+  loadInFrame(visited[visited.length - 1]);
+});
+
+$("frameHome").addEventListener("click", () => {
+  openSite(CONFIG.homeUrl);
+  setBrowserMessage("");
 });
 
 $("browserForm").addEventListener("submit", event => {
