@@ -45,30 +45,20 @@
     <h2>Web Browser</h2>
     <form id="browserForm" class="browser-bar">
       <input id="browserInput" type="text" autocomplete="off" required
-        placeholder="Search the web or enter a website" aria-label="Search or address">
+        placeholder="Search with Brave or enter a website" aria-label="Search or address">
       <button type="submit" class="primary">Go</button>
     </form>
     <p id="browserMessage" class="muted"></p>
 
-    <div id="searchResults" class="search-results hidden">
-      <ol id="resultList" class="result-list"></ol>
-      <div class="result-footer">
-        <div class="pager">
-          <button id="prevPage" type="button">← Previous</button>
-          <button id="nextPage" type="button">Next →</button>
-        </div>
-        <a class="brave-credit" href="https://search.brave.com" target="_blank" rel="noopener">Powered by Brave Search</a>
-      </div>
-    </div>
-
     <div id="frameWrap" class="frame-wrap hidden">
       <div class="frame-toolbar">
-        <button id="backToResults" type="button" class="hidden">← Results</button>
+        <button id="frameBack" type="button" title="Back">←</button>
+        <button id="frameHome" type="button" title="Brave Search home">⌂</button>
         <span id="frameUrl" class="frame-url"></span>
         <a id="frameOpen" class="btn" target="_blank" rel="noopener noreferrer">Open in new tab ↗</a>
       </div>
       <iframe id="browserFrame" title="Embedded website" referrerpolicy="no-referrer"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"></iframe>
     </div>
   </section>
 
