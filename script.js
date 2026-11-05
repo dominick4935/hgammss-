@@ -181,14 +181,13 @@ function loadInFrame(href) {
   $("frameWrap").classList.remove("hidden");
   $("browserFrame").src = href;
   $("frameUrl").textContent = href;
-  $("frameOpen").href = href;
   $("frameBack").disabled = visited.length < 2;
 }
 
 function openSite(href) {
   visited.push(href);
   loadInFrame(href);
-  setBrowserMessage("If a site stays blank, it blocks embedding — use “Open in new tab”.");
+  setBrowserMessage("If a site stays blank, that site doesn't allow being shown inside other websites.");
 }
 
 function runSearch(query) {
@@ -208,6 +207,11 @@ $("frameBack").addEventListener("click", () => {
   if (visited.length < 2) return;
   visited.pop();
   loadInFrame(visited[visited.length - 1]);
+});
+
+$("frameFull").addEventListener("click", () => {
+  const frame = $("browserFrame");
+  (frame.requestFullscreen || frame.webkitRequestFullscreen)?.call(frame);
 });
 
 $("frameHome").addEventListener("click", () => {
@@ -233,6 +237,19 @@ $("browserForm").addEventListener("submit", event => {
     return;
   }
   if (url.protocol === "http:") url.protocol = "https:"; // upgrade insecure links
+
+  // Never use Google: send any google.* address to Brave Search instead
+  if (/(^|\.)google\.[a-z.]+$/i.test(url.hostname)) {
+    const query = url.searchParams.get("q");
+    if (query) {
+      runSearch(query);
+    } else {
+      openSite(CONFIG.homeUrl);
+      setBrowserMessage("Google isn't used here — searching with Brave instead.");
+    }
+    return;
+  }
+
   openSite(url.href);
 });
 
