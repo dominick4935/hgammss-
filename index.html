@@ -55,10 +55,11 @@
         <button id="frameBack" type="button" title="Back">←</button>
         <button id="frameHome" type="button" title="Brave Search home">⌂</button>
         <span id="frameUrl" class="frame-url"></span>
-        <a id="frameOpen" class="btn" target="_blank" rel="noopener noreferrer">Open in new tab ↗</a>
+        <button id="frameFull" type="button" title="Fullscreen">⛶</button>
       </div>
+      <!-- No allow-popups / allow-top-navigation: pages can't open new tabs or leave GameHub -->
       <iframe id="browserFrame" title="Embedded website" referrerpolicy="no-referrer"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"></iframe>
+        sandbox="allow-scripts allow-same-origin allow-forms"></iframe>
     </div>
   </section>
 
