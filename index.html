@@ -1,65 +1,84 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0b0d14">
   <title>GameHub</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<header>
-  <h1>GameHub<span>.</span></h1>
-  <nav>
-    <button onclick="showPage('home')">Games</button>
-    <button onclick="showPage('browser')">Browser</button>
-    <button onclick="showPage('favorites')">Favorites</button>
+<header class="site-header">
+  <h1 class="logo">GameHub<span>.</span></h1>
+  <nav class="nav" aria-label="Main">
+    <button class="nav-btn active" data-page="home">Games</button>
+    <button class="nav-btn" data-page="browser">Browser</button>
+    <button class="nav-btn" data-page="favorites">
+      Favorites <span id="favCount" class="badge">0</span>
+    </button>
   </nav>
 </header>
 
 <main>
-  <section id="home">
+  <!-- GAMES -->
+  <section id="home" class="page">
     <div class="hero">
       <h2>Play Without Limits.</h2>
       <p>Your gaming collection, all in one place.</p>
-      <input id="search" placeholder="Search games..." oninput="renderGames()">
+      <input id="search" type="search" autocomplete="off"
+        placeholder="Search games…  (press / to focus)" aria-label="Search games">
     </div>
 
-    <div class="categories">
-      <button onclick="setCategory('All')">All</button>
-      <button onclick="setCategory('Arcade')">Arcade</button>
-      <button onclick="setCategory('Action')">Action</button>
-      <button onclick="setCategory('Racing')">Racing</button>
-      <button onclick="setCategory('Puzzle')">Puzzle</button>
-    </div>
+    <div id="categories" class="chips" role="group" aria-label="Filter by category"></div>
 
-    <h2>Game Library</h2>
+    <div class="section-head">
+      <h2>Game Library</h2>
+      <span id="resultCount" class="muted"></span>
+    </div>
     <div id="games" class="game-grid"></div>
+    <p id="gamesEmpty" class="empty hidden">No games match your search.</p>
   </section>
 
-  <section id="browser" class="hidden">
+  <!-- BROWSER -->
+  <section id="browser" class="page hidden">
     <h2>Web Browser</h2>
-    <p>Visit websites that allow embedding.</p>
-    <form id="browserForm">
-      <input id="browserUrl" placeholder="https://example.com" required>
-      <button type="submit">Go</button>
+    <form id="browserForm" class="browser-bar">
+      <input id="browserInput" type="text" autocomplete="off" required
+        placeholder="Search the web or enter a website" aria-label="Search or address">
+      <button type="submit" class="primary">Go</button>
     </form>
-    <iframe id="browserFrame" title="Embedded website"
-      referrerpolicy="no-referrer"></iframe>
-    <p id="browserMessage"></p>
+    <p id="browserMessage" class="muted"></p>
+
+    <div id="searchResults" class="search-results hidden">
+      <div id="gcse"></div>
+    </div>
+
+    <div id="frameWrap" class="frame-wrap hidden">
+      <div class="frame-toolbar">
+        <span id="frameUrl" class="frame-url"></span>
+        <a id="frameOpen" class="btn" target="_blank" rel="noopener noreferrer">Open in new tab ↗</a>
+      </div>
+      <iframe id="browserFrame" title="Embedded website" referrerpolicy="no-referrer"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+    </div>
   </section>
 
-  <section id="favorites" class="hidden">
+  <!-- FAVORITES -->
+  <section id="favorites" class="page hidden">
     <h2>Your Favorites</h2>
     <div id="favoriteGames" class="game-grid"></div>
+    <p id="favoritesEmpty" class="empty hidden">No favorites yet — tap ☆ on any game to save it here.</p>
   </section>
 
-  <section id="player" class="hidden">
-    <button onclick="showPage('home')">← Back to games</button>
-    <h2 id="playerTitle"></h2>
-    <iframe id="gameFrame" title="Game player"
-      allowfullscreen></iframe>
+  <!-- PLAYER -->
+  <section id="player" class="page hidden">
+    <div class="player-bar">
+      <button id="backBtn">← Back to games</button>
+      <h2 id="playerTitle"></h2>
+      <button id="fullscreenBtn">⛶ Fullscreen</button>
+    </div>
+    <iframe id="gameFrame" title="Game player" allowfullscreen></iframe>
   </section>
 </main>
 
