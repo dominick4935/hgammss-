@@ -51,11 +51,19 @@
     <p id="browserMessage" class="muted"></p>
 
     <div id="searchResults" class="search-results hidden">
-      <div id="gcse"></div>
+      <ol id="resultList" class="result-list"></ol>
+      <div class="result-footer">
+        <div class="pager">
+          <button id="prevPage" type="button">← Previous</button>
+          <button id="nextPage" type="button">Next →</button>
+        </div>
+        <a class="brave-credit" href="https://search.brave.com" target="_blank" rel="noopener">Powered by Brave Search</a>
+      </div>
     </div>
 
     <div id="frameWrap" class="frame-wrap hidden">
       <div class="frame-toolbar">
+        <button id="backToResults" type="button" class="hidden">← Results</button>
         <span id="frameUrl" class="frame-url"></span>
         <a id="frameOpen" class="btn" target="_blank" rel="noopener noreferrer">Open in new tab ↗</a>
       </div>
