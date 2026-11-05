@@ -1,14 +1,10 @@
 /* ================= CONFIG =================
- * Web search
- * - googleSearchId: paste a Google Programmable Search Engine ID ("cx") to show
- *   results right inside GameHub. Create one free at
- *   https://programmablesearchengine.google.com → "Search the entire web".
- * - Without an ID, searches open in a new tab on the fallback engine.
- *   (Google, Bing and DuckDuckGo all refuse to load inside an iframe.)
+ * Web search (Brave Search, shown inside GameHub)
+ * Paste the URL of your deployed worker.js (see the setup steps at the top of
+ * worker.js), e.g. "https://gamehub-search.yourname.workers.dev"
  */
 const CONFIG = {
-  googleSearchId: "",
-  fallbackSearchUrl: "https://duckduckgo.com/?q="
+  searchProxyUrl: ""
 };
 
 /* ================= GAMES =================
@@ -177,68 +173,111 @@ function looksLikeUrl(text) {
   return /^[\w-]+(\.[\w-]+)+(:\d+)?([/?#].*)?$/.test(text); // e.g. example.com/page
 }
 
-function openSite(href) {
+const searchState = { query: "", offset: 0, more: false, hasResults: false };
+
+function openSite(href, fromResults = false) {
   $("searchResults").classList.add("hidden");
   $("frameWrap").classList.remove("hidden");
+  $("backToResults").classList.toggle("hidden", !(fromResults && searchState.hasResults));
   $("browserFrame").src = href;
   $("frameUrl").textContent = href;
   $("frameOpen").href = href;
   setBrowserMessage("If the page stays blank, that site blocks embedding — use “Open in new tab”.");
 }
 
-let googleSearchReady = null;
-function loadGoogleSearch() {
-  if (googleSearchReady) return googleSearchReady;
-
-  googleSearchReady = new Promise((resolve, reject) => {
-    window.__gcse = {
-      parsetags: "explicit",
-      initializationCallback() {
-        google.search.cse.element.render({
-          div: "gcse",
-          tag: "searchresults-only",
-          gname: "gamehub",
-          attributes: { linkTarget: "_blank" }
-        });
-        resolve(google.search.cse.element.getElement("gamehub"));
-      }
-    };
-
-    const script = document.createElement("script");
-    script.src = "https://cse.google.com/cse.js?cx=" + encodeURIComponent(CONFIG.googleSearchId);
-    script.async = true;
-    script.onerror = () => {
-      googleSearchReady = null;
-      reject(new Error("Search failed to load"));
-    };
-    document.head.appendChild(script);
-  });
-
-  return googleSearchReady;
+function showResults() {
+  $("frameWrap").classList.add("hidden");
+  $("browserFrame").src = "about:blank";
+  $("searchResults").classList.remove("hidden");
 }
 
-function runSearch(query) {
-  if (!CONFIG.googleSearchId) {
-    window.open(CONFIG.fallbackSearchUrl + encodeURIComponent(query), "_blank", "noopener");
-    setBrowserMessage(`Opened results for “${query}” in a new tab.`);
+// Brave descriptions contain <strong> tags; turn them into safe plain text
+function plainText(html) {
+  return new DOMParser().parseFromString(html || "", "text/html").body.textContent;
+}
+
+function renderResults(results) {
+  const list = $("resultList");
+  list.replaceChildren();
+
+  results.forEach(result => {
+    const item = document.createElement("li");
+    item.className = "result";
+
+    const link = document.createElement("a");
+    link.href = result.url;
+    link.className = "result-title";
+    link.textContent = plainText(result.title);
+    link.addEventListener("click", event => {
+      event.preventDefault();
+      openSite(result.url, true);
+    });
+
+    const site = document.createElement("span");
+    site.className = "result-url";
+    site.textContent = result.url.replace(/^https?:\/\//, "");
+
+    const description = document.createElement("p");
+    description.textContent = plainText(result.description);
+
+    item.append(site, link, description);
+    list.appendChild(item);
+  });
+
+  $("prevPage").disabled = searchState.offset === 0;
+  $("nextPage").disabled = !searchState.more;
+}
+
+async function runSearch(query, offset = 0) {
+  showResults();
+
+  if (!CONFIG.searchProxyUrl) {
+    $("resultList").replaceChildren();
+    setBrowserMessage("Search isn't connected yet — add your worker URL to CONFIG.searchProxyUrl in script.js.");
     return;
   }
 
-  $("frameWrap").classList.add("hidden");
-  $("searchResults").classList.remove("hidden");
-  setBrowserMessage(`Searching for “${query}”…`);
+  setBrowserMessage(`Searching Brave for “${query}”…`);
+  $("resultList").classList.add("loading");
 
-  loadGoogleSearch()
-    .then(search => {
-      search.execute(query);
-      setBrowserMessage(`Results for “${query}” — links open in a new tab.`);
-    })
-    .catch(() => {
-      $("searchResults").classList.add("hidden");
-      window.open(CONFIG.fallbackSearchUrl + encodeURIComponent(query), "_blank", "noopener");
-      setBrowserMessage("Built-in search couldn't load, so results opened in a new tab.");
+  try {
+    const endpoint = new URL(CONFIG.searchProxyUrl);
+    endpoint.searchParams.set("q", query);
+    endpoint.searchParams.set("offset", offset);
+
+    const response = await fetch(endpoint);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || `Error ${response.status}`);
+
+    Object.assign(searchState, {
+      query,
+      offset,
+      more: Boolean(data.more),
+      hasResults: data.results.length > 0
     });
+
+    renderResults(data.results);
+    setBrowserMessage(data.results.length
+      ? `Results for “${query}”${offset ? ` — page ${offset + 1}` : ""}`
+      : `No results for “${query}”.`);
+    window.scrollTo({ top: 0 });
+  } catch (error) {
+    setBrowserMessage(`Search failed: ${error.message}`);
+  } finally {
+    $("resultList").classList.remove("loading");
+  }
 }
+
+$("prevPage").addEventListener("click", () =>
+  runSearch(searchState.query, Math.max(0, searchState.offset - 1))
+);
+$("nextPage").addEventListener("click", () =>
+  runSearch(searchState.query, searchState.offset + 1)
+);
+$("backToResults").addEventListener("click", () => {
+  showResults();
+  setBrowserMessage(`Results for “${searchState.query}”`);
+});
 
 $("browserForm").addEventListener("submit", event => {
   event.preventDefault();
